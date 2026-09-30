@@ -1,662 +1,1038 @@
-# Data Discovery
+# Data Discovery — CASE 01: Queda de Vendas
 
-## 1. Objetivo da descoberta dos dados
+## 1. Objetivo da etapa
 
-A etapa de Data Discovery tem como objetivo compreender e documentar a estrutura, o significado, a granularidade e os relacionamentos das tabelas disponíveis no conjunto de dados utilizado no CASE 01 — Queda de Vendas.
+A etapa de Data Discovery tem como objetivo compreender a estrutura, o significado, a granularidade, os relacionamentos, a integridade e as limitações das tabelas disponíveis antes do início da análise exploratória.
 
-Esta etapa antecede o profiling detalhado e a análise exploratória. Seu propósito é estabelecer uma visão estruturada dos dados, identificar quais informações podem contribuir para responder ao problema de negócio e registrar os principais cuidados necessários para evitar interpretações ou cálculos incorretos.
+O princípio metodológico adotado neste projeto é:
 
-A descoberta dos dados será orientada pelo problema de negócio definido para o projeto, evitando a análise indiscriminada de todas as tabelas e variáveis disponíveis.
+> **Os dados determinam a história; a história não determina os dados.**
 
-### Objetivos específicos
+O cenário inicial do projeto considera uma possível deterioração no desempenho de vendas. Entretanto, a hipótese de uma queda específica de 15% não será imposta aos dados.
 
-* compreender o papel de cada tabela no contexto do negócio;
-* identificar a unidade de observação de cada tabela;
-* identificar possíveis chaves primárias e estrangeiras;
-* compreender os relacionamentos entre as tabelas;
-* identificar quais tabelas e atributos são relevantes para o diagnóstico de desempenho de vendas;
-* distinguir dados essenciais, complementares e auxiliares;
-* registrar riscos relacionados à granularidade, duplicidade e relacionamentos entre tabelas;
-* estabelecer uma base metodológica para as etapas posteriores de profiling, análise exploratória e diagnóstico.
+A magnitude, o período, os segmentos e os fatores associados à deterioração serão determinados a partir das evidências observadas no conjunto de dados.
 
 ---
 
-## 2. Problema de negócio
+# 2. Pergunta de negócio
 
-O CASE 01 parte de um cenário empresarial simulado no qual a gestão comercial identificou uma deterioração no desempenho de vendas e solicita uma investigação para compreender o comportamento observado.
+A pergunta de negócio utilizada como orientação para a análise é:
 
-O cenário inicial é apresentado como uma situação de referência — "faturamento caiu 15%" — e não como uma conclusão previamente estabelecida a partir dos dados.
+> **Quais fatores estão associados à variação negativa no desempenho de vendas da operação analisada e quais segmentos concentram essa deterioração?**
 
-A análise deverá verificar o comportamento efetivamente observado no conjunto de dados e, caso a magnitude ou a natureza da variação seja diferente do cenário inicial, adaptar a investigação às evidências encontradas.
-
-### Pergunta central
-
-> Quais fatores estão associados à variação negativa no desempenho de vendas da operação analisada e quais segmentos concentram essa deterioração?
-
-A análise deverá distinguir fatos observados, padrões identificados, hipóteses investigativas e conclusões sustentadas pelos dados, evitando atribuir causalidade sem evidência suficiente.
+A análise deverá, inicialmente, estabelecer se existe de fato uma deterioração relevante no desempenho de vendas e, posteriormente, investigar onde ela ocorre e quais fatores estão associados a esse comportamento.
 
 ---
 
-## 3. Perguntas analíticas
+# 3. Dataset utilizado
 
-A partir da pergunta central do projeto, foram definidas perguntas analíticas que orientarão a descoberta e as etapas posteriores da investigação.
+O projeto utiliza o:
 
-### Desempenho comercial
+**Olist Brazilian E-Commerce Public Dataset**
 
-1. Como o desempenho de vendas evoluiu ao longo do tempo?
-2. O comportamento observado está relacionado à quantidade de pedidos?
-3. O ticket médio apresentou variação relevante ao longo do período?
-4. A quantidade de itens vendidos acompanhou o comportamento dos pedidos?
+O conjunto contém informações relacionadas a pedidos, clientes, itens vendidos, pagamentos, avaliações, produtos e vendedores.
 
-### Produtos e categorias
+Os arquivos disponíveis no projeto são:
 
-5. Quais categorias ou produtos concentram as maiores variações no desempenho?
-6. Existem mudanças relevantes no mix de produtos ao longo do período?
+* `olist_customers_dataset.csv`
+* `olist_geolocation_dataset.csv`
+* `olist_order_items_dataset.csv`
+* `olist_order_payments_dataset.csv`
+* `olist_order_reviews_dataset.csv`
+* `olist_orders_dataset.csv`
+* `olist_products_dataset.csv`
+* `olist_sellers_dataset.csv`
+* `product_category_name_translation.csv`
 
-### Clientes e geografia
-
-7. Existem diferenças relevantes no comportamento das vendas entre estados ou regiões?
-8. Existem segmentos de clientes associados à variação observada?
-
-### Vendedores
-
-9. Existem diferenças relevantes no desempenho entre vendedores?
-10. A variação observada está concentrada em determinados vendedores ou grupos de vendedores?
-
-### Operação e experiência
-
-11. Existem indicadores operacionais que apresentam comportamento associado à variação das vendas?
-12. Existem padrões relacionados a entrega, frete, pagamentos ou avaliações que mereçam investigação?
-
-As perguntas acima representam hipóteses de investigação e não pressupõem que os respectivos fatores expliquem ou causem a variação observada.
-
----
-
-## 4. Necessidades de dados
-
-Para responder às perguntas analíticas definidas, serão necessárias diferentes categorias de informação. A relação abaixo representa a necessidade inicial de dados e será validada durante as etapas seguintes da Data Discovery.
-
-| Necessidade analítica              | Informações necessárias                 | Tabelas potencialmente relevantes               |
-| ---------------------------------- | --------------------------------------- | ----------------------------------------------- |
-| Evolução temporal das vendas       | Data do pedido e valor dos itens        | `orders`, `order_items`                         |
-| Quantidade de pedidos              | Identificador do pedido e data          | `orders`                                        |
-| Receita de vendas                  | Valor dos itens vendidos                | `order_items`                                   |
-| Ticket médio                       | Receita e quantidade de pedidos         | `orders`, `order_items`                         |
-| Quantidade de itens vendidos       | Itens associados aos pedidos            | `order_items`                                   |
-| Produtos vendidos                  | Identificador e atributos do produto    | `order_items`, `products`                       |
-| Categorias de produtos             | Categoria do produto                    | `products`, `product_category_name_translation` |
-| Perfil e localização dos clientes  | Identificador, cidade e estado          | `customers`                                     |
-| Desempenho por vendedor            | Identificador e localização do vendedor | `order_items`, `sellers`                        |
-| Formas e valores de pagamento      | Tipo, parcelas e valor do pagamento     | `order_payments`                                |
-| Avaliação da experiência           | Nota e informações de avaliação         | `order_reviews`                                 |
-| Informações de entrega             | Datas de compra, estimativa e entrega   | `orders`                                        |
-| Informações geográficas adicionais | Coordenadas e localização por CEP       | `geolocation`                                   |
-
-A classificação definitiva das tabelas como essenciais, complementares ou auxiliares será realizada somente após a validação de sua granularidade, chaves, relacionamentos e utilidade para as perguntas do projeto.
-
----
-
-# 5. Descoberta das tabelas
-
-## 5.1 `olist_orders_dataset`
-
-### Papel da tabela
-
-A tabela `orders` representa o nível de **pedido** da operação analisada.
-
-Cada registro corresponde a um pedido identificado por `order_id`.
-
-### Estrutura observada
-
-* Linhas: 99.441
-* Colunas: 8
-* `order_id`: 99.441 valores distintos
-* `order_id`: nenhum valor nulo
-* `customer_id`: 99.441 valores distintos
-* `customer_id`: nenhum valor nulo
-
-### Granularidade
-
-A granularidade observada é:
-
-> **1 linha = 1 pedido**
-
-O `order_id` apresenta unicidade na tabela.
-
-Essa característica é fundamental para métricas como:
-
-* quantidade de pedidos;
-* evolução temporal dos pedidos;
-* distribuição por status;
-* tempo entre etapas do pedido;
-* ticket médio, quando combinado corretamente com o valor dos itens.
-
-### Principais atributos
-
-| Atributo                        | Papel analítico                                          |
-| ------------------------------- | -------------------------------------------------------- |
-| `order_id`                      | Identificador do pedido                                  |
-| `customer_id`                   | Identificador do registro de cliente associado ao pedido |
-| `order_status`                  | Situação do pedido                                       |
-| `order_purchase_timestamp`      | Data/hora da realização do pedido                        |
-| `order_approved_at`             | Data/hora da aprovação                                   |
-| `order_delivered_carrier_date`  | Data/hora de entrega ao transportador                    |
-| `order_delivered_customer_date` | Data/hora da entrega ao cliente                          |
-| `order_estimated_delivery_date` | Data estimada para entrega                               |
-
-### Relacionamentos identificados
-
-`order_id` funciona como chave de relacionamento com tabelas relacionadas ao pedido, principalmente:
-
-* `order_items`;
-* `order_payments`;
-* `order_reviews`.
-
-`customer_id` relaciona `orders` com `customers`.
-
-### Observação importante sobre `customer_id`
-
-Embora `customer_id` seja utilizado como identificador do cliente associado ao pedido, a análise mostrou que cada `customer_id` aparece uma única vez em `orders`.
-
-Portanto, neste dataset:
-
-> `customer_id` não deve ser utilizado isoladamente para identificar recorrência de clientes.
-
-Para análises de comportamento recorrente, deverá ser utilizado `customer_unique_id`, presente na tabela `customers`.
-
-### Decisão analítica
-
-A tabela `orders` será uma das tabelas centrais do CASE 01, principalmente para:
-
-* contagem de pedidos;
-* análise temporal;
-* status dos pedidos;
-* relacionamento com clientes;
-* análise de prazos e entrega;
-* construção do modelo analítico do projeto.
-
----
-
-# 5.2 `olist_customers_dataset`
-
-### Papel da tabela
-
-A tabela `customers` contém informações cadastrais e geográficas dos clientes associados aos pedidos.
-
-### Estrutura observada
-
-* Linhas: 99.441
-* Colunas: 5
-* `customer_id`: 99.441 valores distintos
-* `customer_id`: nenhum valor nulo
-* `customer_unique_id`: 96.096 valores distintos
-* `customer_unique_id`: nenhum valor nulo
-
-### Granularidade
-
-A tabela apresenta:
-
-> **1 linha = 1 registro de cliente associado a um `customer_id`**
-
-Foi verificada correspondência completa entre os `customer_id` presentes em `orders` e `customers`:
-
-* `customer_id` de `orders` sem correspondência em `customers`: 0
-* `customer_id` de `customers` sem correspondência em `orders`: 0
-
-### `customer_id` × `customer_unique_id`
-
-Foi identificada uma distinção importante para a análise de clientes.
-
-`customer_id` identifica o registro cadastral associado ao pedido, enquanto `customer_unique_id` permite identificar o cliente em nível de negócio.
-
-Foram identificados:
-
-* 96.096 `customer_unique_id` distintos;
-* 2.997 `customer_unique_id` associados a mais de um `customer_id`;
-* máximo de 17 `customer_id` associados a um único `customer_unique_id`.
-
-### Implicação analítica
-
-Para análises como:
-
-* recorrência;
-* frequência de compras;
-* retenção;
-* comportamento de clientes;
-* segmentação por cliente;
-
-deverá ser utilizado:
-
-> `customer_unique_id`
-
-e não simplesmente `customer_id`.
-
-### Informações geográficas
-
-A tabela contém:
-
-* 27 estados distintos;
-* 4.119 cidades distintas;
-* 14.994 CEPs distintos.
-
-Essas informações permitem análises de vendas por localização geográfica.
-
-### Decisão analítica
-
-A tabela `customers` será utilizada principalmente para:
-
-* segmentação geográfica;
-* identificação de clientes;
-* análise de recorrência;
-* relacionamento entre pedidos e clientes.
-
-A variável `customer_unique_id` será considerada a referência para análises de comportamento recorrente.
-
----
-
-# 5.3 `olist_order_items_dataset`
-
-### Papel da tabela
-
-A tabela `order_items` representa os itens comercializados dentro dos pedidos.
-
-É uma das principais tabelas para o cálculo das métricas de vendas do CASE 01.
-
-### Estrutura observada
-
-* Linhas: 112.650
-* Colunas: 7
-* `order_id` distintos: 98.666
-* `order_id`: nenhum valor nulo
-* `order_item_id`: 21 valores distintos
-* `order_item_id`: nenhum valor nulo
-
-### Granularidade
-
-A granularidade observada é:
-
-> **1 linha = 1 item/linha de item associado a um pedido**
-
-Dessa forma:
-
-* número de linhas ≠ número de pedidos;
-* um pedido pode possuir vários itens;
-* `order_id` não é uma chave única nesta tabela.
-
-Foi verificada a unicidade da combinação:
-
-> `order_id` + `order_item_id`
-
-Não foram identificadas duplicidades nessa combinação.
-
-### Principais atributos
-
-| Atributo              | Papel analítico                       |
-| --------------------- | ------------------------------------- |
-| `order_id`            | Identificador do pedido               |
-| `order_item_id`       | Sequência do item dentro do pedido    |
-| `product_id`          | Identificador do produto              |
-| `seller_id`           | Identificador do vendedor             |
-| `shipping_limit_date` | Limite de envio informado para o item |
-| `price`               | Valor do item                         |
-| `freight_value`       | Valor do frete associado ao item      |
-
-### Relacionamento com `orders`
-
-Foram identificados 98.666 pedidos presentes em `order_items`.
-
-Existem 775 pedidos presentes em `orders` que não possuem registros em `order_items`.
-
-Esses pedidos apresentam os seguintes status:
-
-| Status        | Pedidos sem itens |
-| ------------- | ----------------: |
-| `unavailable` |               603 |
-| `canceled`    |               164 |
-| `created`     |                 5 |
-| `invoiced`    |                 2 |
-| `shipped`     |                 1 |
-| **Total**     |           **775** |
-
-A concentração desses pedidos nos status `unavailable` e `canceled` foi registrada como uma observação de descoberta.
-
-Essa associação não será interpretada como causalidade.
-
-### Relacionamento com produtos
-
-Todos os `product_id` presentes em `order_items` possuem correspondência em `products`.
-
-Também não foram identificados produtos cadastrados em `products` sem ocorrência em `order_items`.
-
-Relacionamento conceitual:
-
-> `products` 1:N `order_items`
-
-### Relacionamento com vendedores
-
-Todos os `seller_id` presentes em `order_items` possuem correspondência em `sellers`.
-
-Também não foram identificados vendedores cadastrados em `sellers` sem ocorrência em `order_items`.
-
-Relacionamento conceitual:
-
-> `sellers` 1:N `order_items`
-
-### Implicações para métricas
-
-Para o CASE 01:
-
-**Pedidos:**
-
-> `COUNT(DISTINCT order_id)`
-
-**Itens vendidos:**
-
-> `COUNT(*)`
-
-**Valor dos produtos:**
-
-> `SUM(price)`
-
-**Frete:**
-
-> `SUM(freight_value)`
-
-Portanto, não será utilizado simplesmente o número de linhas de `order_items` como quantidade de pedidos.
-
-### Decisão analítica
-
-`order_items` será uma das principais tabelas do projeto e será utilizada como fonte primária para o valor dos produtos comercializados.
-
-A variável `price` será utilizada como base da métrica de receita de produtos, mantendo `freight_value` como componente separado.
-
----
-
-# 5.4 `olist_order_payments_dataset`
-
-### Papel da tabela
-
-A tabela `order_payments` registra informações relacionadas aos pagamentos dos pedidos.
-
-Ela é complementar à análise comercial e permite investigar características como:
-
-* modalidade de pagamento;
-* número de parcelas;
-* sequência dos registros de pagamento;
-* valor registrado nos pagamentos.
-
-### Estrutura observada
-
-* Linhas: 103.886
-* Colunas: 5
-* `order_id` distintos: 99.440
-* `order_id`: nenhum valor nulo
-
-Como o número de linhas é superior ao número de pedidos distintos, `order_id` não representa uma chave única nessa tabela.
-
-### Granularidade
-
-A granularidade observada é:
-
-> **1 linha = 1 registro de pagamento associado a um pedido**
-
-Um mesmo pedido pode possuir múltiplos registros de pagamento.
-
-Foram identificados:
-
-* 2.961 pedidos com mais de um registro de pagamento;
-* máximo de 29 registros de pagamento para um único pedido.
-
-### `payment_sequential`
-
-`payment_sequential` representa a sequência dos registros de pagamento dentro do pedido.
-
-Foram identificados valores de 1 a 29.
-
-Essa variável não deve ser confundida com `payment_installments`.
-
-### `payment_installments`
-
-Representa o número de parcelas associado ao registro de pagamento.
-
-Foram identificados dois registros com `payment_installments = 0`, ambos associados a pagamentos com cartão de crédito.
-
-Esses registros foram classificados como casos atípicos para investigação posterior, sem correção ou exclusão nesta etapa.
-
-### Relacionamento com `orders`
-
-Todos os `order_id` presentes em `order_payments` possuem correspondência em `orders`.
-
-Foi identificado um pedido presente em `orders` sem registro correspondente em `order_payments`:
-
-`bfbd0f9bdef84302105ad712db648a6c`
-
-Esse pedido apresenta status `delivered`, possui itens e avaliação, mas não possui registro na tabela de pagamentos.
-
-O caso foi registrado como uma inconsistência entre tabelas e não será interpretado como erro do dataset sem investigação adicional.
-
-### Tipos de pagamento
-
-Foram identificados os seguintes tipos:
-
-| Tipo          | Registros |
-| ------------- | --------: |
-| `credit_card` |    76.795 |
-| `boleto`      |    19.784 |
-| `voucher`     |     5.775 |
-| `debit_card`  |     1.529 |
-| `not_defined` |         3 |
-
-Os três registros classificados como `not_defined` possuem `payment_value = 0`.
-
-Esses registros serão considerados casos atípicos, sem inferir que representam necessariamente pagamentos não realizados.
-
----
-
-## 5.4.1 Comparação entre pagamentos e itens
-
-Foi realizada uma comparação entre:
-
-> `SUM(payment_value)` por pedido
-
-e
-
-> `SUM(price) + SUM(freight_value)` por pedido.
-
-Foram comparados 98.665 pedidos presentes simultaneamente nas duas estruturas.
-
-### Resultado
-
-* 98.365 pedidos apresentaram diferença de até R$ 0,01;
-* 300 pedidos apresentaram diferença superior a R$ 0,01.
-
-Isso representa aproximadamente 99,70% dos pedidos comparáveis com correspondência dentro da tolerância de R$ 0,01.
-
-As divergências foram classificadas por magnitude:
-
-| Faixa de diferença absoluta | Pedidos |
-| --------------------------- | ------: |
-| Até R$ 0,05                 |  98.405 |
-| R$ 0,06 a R$ 10             |     162 |
-| R$ 10,01 a R$ 50            |      90 |
-| Acima de R$ 50              |       8 |
-
-A faixa "Até R$ 0,05" inclui tanto correspondências exatas quanto pequenas diferenças superiores a R$ 0,01 e inferiores ou iguais a R$ 0,05.
-
-### Comportamento temporal
-
-As divergências foram observadas em diferentes momentos do período analisado, desde outubro de 2016 até períodos posteriores.
-
-Não foi identificada, nesta etapa, evidência de concentração das divergências em um único intervalo temporal.
-
-### Distribuição por tipo de pagamento
-
-Entre os 300 pedidos com divergência:
-
-| Tipo de pagamento | Pedidos com divergência |
-| ----------------- | ----------------------: |
-| `credit_card`     |                     290 |
-| `boleto`          |                      13 |
-| `debit_card`      |                       7 |
-| `voucher`         |                       7 |
-
-Como os tipos de pagamento possuem volumes totais muito diferentes, a quantidade absoluta de divergências não foi utilizada isoladamente para inferir concentração.
-
-A taxa de divergência observada foi:
-
-| Tipo de pagamento | Total de pedidos | Com divergência |   Taxa |
-| ----------------- | ---------------: | --------------: | -----: |
-| `debit_card`      |            1.520 |               7 | 0,461% |
-| `credit_card`     |           74.883 |             278 | 0,371% |
-| `voucher`         |            2.648 |               2 | 0,076% |
-| `boleto`          |           19.614 |              13 | 0,066% |
-
-As taxas observadas são baixas em todos os grupos. A diferença numérica entre as modalidades não será interpretada como evidência de causa nesta etapa.
-
-### Decisão metodológica
-
-A análise mostrou que `payment_value` apresenta alta compatibilidade com a soma de produtos e frete na maior parte dos pedidos, porém existem divergências que ainda não possuem explicação determinada.
-
-Por esse motivo:
-
-> `payment_value` não será utilizado automaticamente como fonte primária da receita de produtos do CASE 01.
-
-A métrica principal de receita de produtos será calculada a partir de:
-
-> `SUM(order_items.price)`
-
-O frete será analisado separadamente a partir de:
-
-> `SUM(order_items.freight_value)`
-
-`payment_value` permanecerá disponível como variável relacionada ao comportamento de pagamentos e poderá ser utilizada em análises específicas quando sua interpretação for adequada.
-
-Essa decisão evita transformar uma variável de pagamento em uma métrica de receita sem validação suficiente de sua semântica.
-
----
-
-# 6. Modelo inicial de relacionamentos
-
-Com base nas descobertas realizadas até o momento, foi estabelecido o seguinte modelo conceitual inicial:
+Os arquivos originais estão armazenados em:
 
 ```text
-                         customers
-                             │
-                       customer_id
-                             │
-                             ▼
-                          orders
-                             │
-             ┌───────────────┼────────────────┐
-             │               │                │
-          order_id        order_id         order_id
-             │               │                │
-             ▼               ▼                ▼
-       order_items    order_payments    order_reviews
-             │
-        ┌────┴────┐
-        │         │
-   product_id  seller_id
-        │         │
-        ▼         ▼
-    products    sellers
+data/raw/
 ```
 
-Para análise de recorrência de clientes:
+Essa pasta está incluída no `.gitignore`, portanto os dados brutos não serão versionados no repositório.
+
+---
+
+# 4. Inventário das tabelas
+
+| Tabela               |    Linhas | Colunas | Papel preliminar        |
+| -------------------- | --------: | ------: | ----------------------- |
+| orders               |    99.441 |       8 | Central                 |
+| customers            |    99.441 |       5 | Central                 |
+| order_items          |   112.650 |       7 | Central                 |
+| payments             |   103.886 |       5 | Complementar            |
+| reviews              |    99.224 |       7 | Complementar            |
+| products             |    32.951 |       9 | Complementar            |
+| sellers              |     3.095 |       4 | Complementar            |
+| category translation |        71 |       2 | Auxiliar                |
+| geolocation          | 1.000.163 |       5 | Potencialmente auxiliar |
+
+A classificação poderá ser revista durante a análise caso alguma dimensão demonstre relevância adicional para a pergunta de negócio.
+
+---
+
+# 5. Tabela `orders`
+
+Arquivo:
+
+```text
+olist_orders_dataset.csv
+```
+
+Dimensão:
+
+```text
+99.441 linhas × 8 colunas
+```
+
+A tabela possui uma linha por `order_id`.
+
+O campo `order_id` apresentou:
+
+* 99.441 valores únicos;
+* nenhum valor nulo.
+
+Portanto:
+
+> **Granularidade: 1 linha = 1 pedido.**
+
+## Principais relacionamentos
+
+`order_id` relaciona-se com:
+
+* `order_items`
+* `order_payments`
+* `order_reviews`
+
+`customer_id` relaciona-se com:
+
+* `customers`
+
+## Campos temporais
+
+A tabela contém datas relacionadas ao ciclo do pedido, incluindo:
+
+* criação;
+* aprovação;
+* envio ao transportador;
+* entrega ao cliente;
+* previsão de entrega.
+
+Esses campos poderão ser utilizados posteriormente para análise temporal e operacional.
+
+## Valores ausentes
+
+Foram identificados valores ausentes em diferentes datas e diferentes status de pedidos.
+
+Por exemplo:
+
+* `order_approved_at` apresenta ausências em pedidos cancelados, entregues e criados;
+* `order_delivered_carrier_date` apresenta ausências em diferentes status;
+* `order_delivered_customer_date` também apresenta ausências em diferentes status.
+
+A ausência de uma data não será automaticamente tratada como erro.
+
+A interpretação deverá considerar o status do pedido e o contexto da variável.
+
+Foi identificada também a existência de pedidos com status `delivered` sem `order_delivered_customer_date`.
+
+Essa situação será tratada como uma limitação/inconsistência a ser considerada em análises operacionais, sem assumir automaticamente que o registro esteja incorreto.
+
+---
+
+# 6. Tabela `customers`
+
+Arquivo:
+
+```text
+olist_customers_dataset.csv
+```
+
+Dimensão:
+
+```text
+99.441 linhas × 5 colunas
+```
+
+`customer_id` apresentou:
+
+* 99.441 valores únicos;
+* nenhum valor nulo.
+
+Existe correspondência integral entre os `customer_id` presentes em `orders` e os cadastrados em `customers`.
+
+## `customer_id` × `customer_unique_id`
+
+A tabela possui também:
 
 ```text
 customer_unique_id
-        │
-        ├── customer_id
-        ├── customer_id
-        ├── customer_id
-        └── ...
 ```
 
-Esse relacionamento deverá ser considerado nas análises de comportamento recorrente dos clientes.
+Foram encontrados:
+
+* 96.096 `customer_unique_id` únicos;
+* 2.997 `customer_unique_id` associados a mais de um `customer_id`;
+* máximo de 17 `customer_id` associados a um mesmo `customer_unique_id`.
+
+Isso é metodologicamente importante.
+
+Para análises de:
+
+* recorrência;
+* frequência de compra;
+* retenção;
+* comportamento do cliente;
+* quantidade de pedidos por cliente;
+
+deve-se utilizar:
+
+```text
+customer_unique_id
+```
+
+e não simplesmente `customer_id`.
 
 ---
 
-# 7. Classificação preliminar das tabelas
+# 7. Tabela `order_items`
 
-Com as descobertas realizadas até o momento, as tabelas podem ser classificadas preliminarmente da seguinte forma:
+Arquivo:
 
-### Tabelas centrais
+```text
+olist_order_items_dataset.csv
+```
 
-* `olist_orders_dataset`
-* `olist_order_items_dataset`
-* `olist_customers_dataset`
+Dimensão:
 
-Essas tabelas são fundamentais para reconstruir o comportamento comercial, os pedidos, os itens vendidos e o perfil dos clientes.
+```text
+112.650 linhas × 7 colunas
+```
 
-### Tabelas complementares
+A tabela representa os itens associados aos pedidos.
 
-* `olist_order_payments_dataset`
-* `olist_order_reviews_dataset`
-* `olist_products_dataset`
-* `olist_sellers_dataset`
+`order_id` possui:
 
-Essas tabelas permitem aprofundar o diagnóstico em dimensões financeiras, experiência do cliente, produtos e vendedores.
+```text
+98.666 pedidos distintos
+```
 
-### Tabela auxiliar
+A combinação:
 
-* `product_category_name_translation.csv`
+```text
+(order_id, order_item_id)
+```
 
-Sua função principal será auxiliar na interpretação e apresentação das categorias de produtos.
+não apresentou duplicidades.
 
-### Tabela potencialmente auxiliar
+Portanto, essa combinação representa a chave adequada para a granularidade dos itens.
 
-* `olist_geolocation_dataset`
+## Pedidos sem itens
 
-Sua utilização dependerá das necessidades de análise geográfica identificadas nas etapas posteriores.
+Foram identificados:
 
-Essa classificação é preliminar e poderá ser revisada conforme novas descobertas sejam realizadas.
+```text
+775 pedidos em orders sem registro correspondente em order_items
+```
+
+A distribuição desses pedidos por status mostrou concentração principalmente em:
+
+* `unavailable`: 603
+* `canceled`: 164
+
+Também foram encontrados poucos casos em outros status.
+
+Essa ausência não será tratada automaticamente como erro.
+
+Para análises de receita de produtos, o conjunto de `order_items` será utilizado como fonte principal.
+
+## Receita
+
+O campo:
+
+```text
+price
+```
+
+representa o valor do produto no item.
+
+Assim, para a análise principal de receita de produtos:
+
+```text
+Receita de produtos = SUM(price)
+```
+
+O campo:
+
+```text
+freight_value
+```
+
+será tratado separadamente como valor de frete.
 
 ---
 
-# 8. Principais decisões metodológicas registradas
+# 8. Tabela `order_payments`
 
-Até o momento, foram estabelecidas as seguintes decisões:
+Arquivo:
 
-1. O cenário de "queda de 15%" não será tratado como fato previamente confirmado pelos dados.
-2. As conclusões deverão ser determinadas pelas evidências encontradas no dataset.
-3. `order_id` representa um pedido na tabela `orders`.
-4. `order_items` possui granularidade de item, e não de pedido.
-5. Pedidos deverão ser contabilizados por `COUNT(DISTINCT order_id)` quando a análise partir de `order_items`.
-6. `customer_unique_id` será utilizado para análises de recorrência e comportamento de clientes.
-7. `order_items.price` será a fonte primária para a métrica de receita de produtos.
-8. `freight_value` será analisado separadamente.
-9. `payment_value` não será tratado automaticamente como receita.
-10. Divergências entre pagamentos e itens serão preservadas para análise, sem correção ou exclusão durante a Data Discovery.
-11. Associações observadas entre variáveis não serão tratadas automaticamente como relações causais.
-12. Tabelas serão selecionadas conforme sua capacidade de responder às perguntas de negócio, e não simplesmente porque fazem parte do dataset.
+```text
+olist_order_payments_dataset.csv
+```
+
+Dimensão:
+
+```text
+103.886 linhas × 5 colunas
+```
+
+`order_id` possui 99.440 valores únicos.
+
+Foram identificados:
+
+```text
+2.961 pedidos com mais de um registro de pagamento
+```
+
+Portanto:
+
+> `order_payments` não possui granularidade de uma linha por pedido.
+
+O campo:
+
+```text
+payment_sequential
+```
+
+representa a sequência dos pagamentos e não deve ser confundido com o número de parcelas.
+
+## Tipos de pagamento
+
+Foram encontrados:
+
+* credit_card
+* boleto
+* voucher
+* debit_card
+* not_defined
+
+Existem 3 registros classificados como `not_defined`, todos com `payment_value = 0`.
+
+A estrutura será preservada sem assumir automaticamente que esses registros representam erro ou ausência de pagamento.
+
+## Comparação com `order_items`
+
+Foi realizada a comparação entre:
+
+```text
+price + freight_value
+```
+
+e:
+
+```text
+payment_value
+```
+
+agregado por pedido.
+
+Foram analisados:
+
+```text
+98.665 pedidos
+```
+
+Resultados:
+
+* 98.365 pedidos apresentaram diferença de até R$ 0,01;
+* 300 apresentaram divergência superior a R$ 0,01.
+
+Entre os 300 casos divergentes:
+
+* média da diferença: aproximadamente R$ 9,57;
+* mediana: aproximadamente R$ 5,43;
+* mínimo: aproximadamente -R$ 51,62;
+* máximo: aproximadamente R$ 182,81.
+
+As divergências aparecem em diferentes períodos e não estão restritas a um único intervalo temporal.
+
+## Decisão metodológica
+
+A fonte principal para receita de produtos será:
+
+```text
+order_items.price
+```
+
+`payment_value` será utilizado como variável complementar para análises relacionadas a pagamentos.
+
+Não será utilizada uma regra simplista de substituição ou ajuste dos valores divergentes sem investigação específica.
 
 ---
 
-# 9. Próximas etapas da Data Discovery
+# 9. Tabela `order_reviews`
 
-Após a consolidação das tabelas já investigadas, a descoberta continuará priorizando as estruturas diretamente relacionadas ao problema de negócio.
+Arquivo:
 
-A próxima etapa será investigar:
+```text
+olist_order_reviews_dataset.csv
+```
 
-1. `olist_products_dataset`
-2. `product_category_name_translation`
-3. `olist_sellers_dataset`
-4. `olist_order_reviews_dataset`
-5. `olist_geolocation_dataset`
+Dimensão:
 
-A prioridade será determinada pela relevância para as perguntas analíticas e pelos relacionamentos identificados no modelo.
+```text
+99.224 linhas × 7 colunas
+```
 
-Após a conclusão da Data Discovery, será realizada a etapa de **Data Profiling**, na qual serão investigados de forma sistemática:
+A tabela contém:
 
-* tipos de dados;
-* valores nulos;
-* duplicidades;
-* integridade das chaves;
-* valores inválidos ou atípicos;
-* distribuição das variáveis;
-* consistência temporal;
-* qualidade dos dados;
-* regras de tratamento necessárias para a análise.
+* identificação da avaliação;
+* pedido;
+* nota;
+* título;
+* mensagem;
+* data de criação;
+* data de resposta.
 
-A análise exploratória e os cálculos estatísticos somente serão iniciados após essa etapa de compreensão e validação estrutural dos dados.
+## Granularidade
+
+Foram identificados:
+
+```text
+98.673 pedidos distintos com avaliações
+```
+
+Distribuição de avaliações por pedido:
+
+* 98.126 pedidos com 1 avaliação;
+* 543 pedidos com 2 avaliações;
+* 4 pedidos com 3 avaliações.
+
+Portanto:
+
+```text
+547 pedidos possuem múltiplas avaliações.
+```
+
+## `review_id`
+
+Foram observados:
+
+```text
+99.224 linhas
+98.410 review_id únicos
+```
+
+Existem valores de `review_id` repetidos.
+
+A combinação:
+
+```text
+(order_id, review_id)
+```
+
+não apresentou duplicidades.
+
+Portanto:
+
+> `review_id` não deve ser tratado isoladamente como identificador globalmente único.
+
+## Múltiplas avaliações
+
+Nos 547 pedidos com múltiplas avaliações:
+
+* 155 possuem uma única data distinta;
+* 390 possuem duas datas distintas;
+* 2 possuem três datas distintas.
+
+Assim:
+
+```text
+392 de 547 pedidos
+```
+
+possuem avaliações registradas em datas diferentes.
+
+Quanto às notas:
+
+* 345 pedidos mantêm a mesma nota;
+* 202 apresentam notas diferentes.
+
+Foi observada a seguinte classificação conjunta:
+
+| Situação                            | Quantidade |
+| ----------------------------------- | ---------: |
+| Datas diferentes + mesma nota       |        220 |
+| Datas diferentes + notas diferentes |        172 |
+| Mesma data + mesma nota             |        125 |
+| Mesma data + notas diferentes       |         30 |
+
+## Texto das avaliações
+
+Foi criada uma representação combinada de título e mensagem para comparação do conteúdo textual.
+
+Entre os pedidos com múltiplas avaliações:
+
+* 313 possuem um único texto distinto;
+* 232 possuem dois textos distintos;
+* 2 possuem três textos distintos.
+
+Portanto:
+
+```text
+234 de 547 pedidos
+```
+
+possuem avaliações com textos diferentes.
+
+## Decisão metodológica
+
+As múltiplas avaliações não serão consideradas duplicidades automaticamente.
+
+Não será utilizado:
+
+```python
+drop_duplicates("review_id")
+```
+
+nem:
+
+```python
+drop_duplicates("order_id")
+```
+
+como regra geral.
+
+Também não será utilizado arbitrariamente o primeiro ou o último registro de cada pedido.
+
+Caso uma análise futura exija uma linha por pedido, deverá ser criada uma agregação explícita e documentada de acordo com a pergunta de negócio.
+
+A tabela de reviews será tratada como uma dimensão complementar de satisfação e experiência do cliente.
+
+---
+
+# 10. Tabela `products`
+
+Arquivo:
+
+```text
+olist_products_dataset.csv
+```
+
+Dimensão:
+
+```text
+32.951 linhas × 9 colunas
+```
+
+`product_id` apresentou:
+
+* 32.951 valores únicos;
+* nenhum valor nulo;
+* nenhuma duplicidade completa de linha.
+
+Todos os produtos presentes em `order_items` possuem correspondência no cadastro de produtos.
+
+Também não foram encontrados produtos cadastrados sem presença em `order_items`.
+
+## Categorias
+
+Foram identificadas:
+
+```text
+73 categorias não nulas
+```
+
+Existem:
+
+```text
+610 produtos sem categoria
+```
+
+Todos esses produtos aparecem em `order_items`.
+
+Esses produtos representam:
+
+```text
+1.603 linhas de venda
+```
+
+ou aproximadamente:
+
+```text
+1,42% das linhas de order_items
+```
+
+Esse percentual se refere a linhas de venda, não à receita.
+
+## Dados físicos
+
+Foram identificados:
+
+* 2 produtos com peso ausente;
+* 2 produtos com comprimento ausente;
+* 2 produtos com altura ausente;
+* 2 produtos com largura ausente.
+
+Também foram encontrados 4 produtos com peso igual a zero.
+
+Foram identificados 6 produtos com alguma inconsistência ou ausência nos atributos físicos.
+
+Esses registros possuem vendas e representam aproximadamente:
+
+```text
+R$ 3.446,50
+```
+
+em receita de produtos.
+
+Não será feita correção artificial desses valores nesta etapa.
+
+Eles serão tratados como uma limitação de qualidade dos dados.
+
+---
+
+# 11. Tabela `product_category_name_translation`
+
+Arquivo:
+
+```text
+product_category_name_translation.csv
+```
+
+Dimensão:
+
+```text
+71 linhas × 2 colunas
+```
+
+A tabela apresenta traduções entre nomes de categorias em português e inglês.
+
+Foram identificadas 2 categorias presentes em `products` sem tradução:
+
+```text
+pc_gamer
+portateis_cozinha_e_preparadores_de_alimentos
+```
+
+Essas categorias possuem:
+
+* 13 produtos;
+* 24 linhas de venda;
+* R$ 5.514,48 em receita de produtos.
+
+Portanto, essas categorias não devem ser excluídas da análise apenas por ausência de tradução.
+
+Os nomes originais em português serão preservados.
+
+A tradução será considerada uma dimensão auxiliar para apresentação, quando aplicável.
+
+---
+
+# 12. Tabela `sellers`
+
+Arquivo:
+
+```text
+olist_sellers_dataset.csv
+```
+
+Dimensão:
+
+```text
+3.095 linhas × 4 colunas
+```
+
+`seller_id` apresentou:
+
+* 3.095 valores únicos;
+* nenhum valor nulo;
+* nenhuma duplicidade completa.
+
+Todos os sellers presentes em `order_items` possuem cadastro correspondente.
+
+Também não foram identificados sellers cadastrados sem vendas.
+
+## Localização
+
+Os sellers estão distribuídos em:
+
+```text
+23 UFs
+```
+
+A localização do seller deve ser distinguida da localização do cliente.
+
+Portanto:
+
+```text
+seller_state != customer_state
+```
+
+representam dimensões geográficas diferentes e não devem ser utilizadas como se fossem a mesma variável.
+
+## Distribuição das vendas
+
+Foram calculadas as vendas por seller.
+
+Para `linhas_venda`:
+
+* média: 36,40;
+* mediana: 8;
+* máximo: 2.033.
+
+Para `receita_produtos`:
+
+* média: R$ 4.391,48;
+* mediana: R$ 821,48;
+* máximo: R$ 229.472,63.
+
+A diferença entre média e mediana demonstra uma distribuição assimétrica, com presença de sellers com volumes de venda muito superiores aos valores centrais.
+
+Essa observação é descritiva e não implica, por si só, concentração causal ou desempenho superior.
+
+---
+
+# 13. Tabela `geolocation`
+
+Arquivo:
+
+```text
+olist_geolocation_dataset.csv
+```
+
+Dimensão:
+
+```text
+1.000.163 linhas × 5 colunas
+```
+
+A tabela possui informações geográficas associadas a prefixos de CEP.
+
+Neste momento, ela não é considerada essencial para responder à pergunta central do projeto.
+
+Poderá ser utilizada posteriormente caso uma análise geográfica mais detalhada seja necessária.
+
+---
+
+# 14. Modelo lógico identificado
+
+A estrutura principal pode ser representada conceitualmente da seguinte maneira:
+
+```text
+CUSTOMERS
+    │
+    │ customer_id
+    ▼
+ ORDERS
+    │
+    ├──────────────► PAYMENTS
+    │
+    ├──────────────► REVIEWS
+    │
+    └──────────────► ORDER_ITEMS
+                         │
+                         ├────────► PRODUCTS
+                         │
+                         └────────► SELLERS
+```
+
+A tabela de tradução de categorias complementa:
+
+```text
+PRODUCTS
+    │
+    ▼
+CATEGORY TRANSLATION
+```
+
+A tabela de geolocalização permanece como dimensão potencialmente auxiliar.
+
+---
+
+# 15. Tabelas centrais para a análise
+
+Para o problema de negócio definido, as principais tabelas são:
+
+### 1. `orders`
+
+Utilização:
+
+* pedidos;
+* status;
+* datas;
+* ciclo do pedido;
+* análise temporal.
+
+### 2. `order_items`
+
+Utilização:
+
+* receita;
+* itens vendidos;
+* produtos;
+* sellers;
+* preço;
+* frete.
+
+### 3. `customers`
+
+Utilização:
+
+* identificação do cliente;
+* recorrência;
+* localização;
+* comportamento de compra.
+
+Essas três tabelas formam o núcleo principal da análise.
+
+---
+
+# 16. Tabelas complementares
+
+### `payments`
+
+Utilização:
+
+* forma de pagamento;
+* parcelamento;
+* validação/complementação de valores.
+
+### `reviews`
+
+Utilização:
+
+* satisfação;
+* experiência;
+* avaliação do pedido.
+
+### `products`
+
+Utilização:
+
+* categoria;
+* características do produto;
+* dimensões físicas.
+
+### `sellers`
+
+Utilização:
+
+* vendedor;
+* localização;
+* concentração/distribuição das vendas.
+
+---
+
+# 17. Tabelas auxiliares
+
+### `product_category_name_translation`
+
+Utilização:
+
+* tradução das categorias;
+* apresentação dos resultados.
+
+### `geolocation`
+
+Utilização potencial:
+
+* análises geográficas mais detalhadas.
+
+---
+
+# 18. Definição preliminar dos principais KPIs
+
+Os principais indicadores que poderão ser utilizados na análise são:
+
+### Receita de produtos
+
+```text
+SUM(order_items.price)
+```
+
+### Frete
+
+```text
+SUM(order_items.freight_value)
+```
+
+### Pedidos
+
+```text
+COUNT(DISTINCT order_id)
+```
+
+### Itens vendidos
+
+```text
+COUNT(order_item_id)
+```
+
+### Clientes
+
+Para análises de clientes:
+
+```text
+COUNT(DISTINCT customer_unique_id)
+```
+
+### Ticket médio
+
+Conceitualmente:
+
+```text
+Receita de produtos / quantidade de pedidos
+```
+
+Essas métricas serão calculadas somente após definição das regras de inclusão/exclusão dos pedidos de acordo com a pergunta analítica.
+
+---
+
+# 19. Possível decomposição do desempenho de vendas
+
+Uma das linhas de investigação será decompor a receita em componentes.
+
+Conceitualmente:
+
+```text
+Receita
+   │
+   ├── Quantidade de pedidos
+   │
+   └── Ticket médio
+```
+
+Posteriormente, o ticket poderá ser decomposto em dimensões como:
+
+```text
+Itens por pedido
+        ×
+Preço médio por item
+```
+
+Também poderão ser investigadas dimensões como:
+
+* clientes;
+* frequência de compra;
+* categorias;
+* produtos;
+* sellers;
+* regiões;
+* período.
+
+A seleção definitiva será determinada pelos resultados observados nos dados.
+
+---
+
+# 20. Principais riscos metodológicos identificados
+
+## Risco 1 — Forçar a hipótese de queda de 15%
+
+A análise não assumirá que a queda foi exatamente de 15%.
+
+Primeiro será necessário medir o comportamento real da receita e dos demais KPIs.
+
+---
+
+## Risco 2 — Utilizar `payment_value` como receita principal
+
+Como existem divergências entre pagamentos e valores de itens + frete, `payment_value` não será utilizado como fonte única de receita.
+
+A receita principal será baseada em:
+
+```text
+order_items.price
+```
+
+---
+
+## Risco 3 — Confundir `customer_id` com cliente real
+
+Para recorrência e frequência será utilizado:
+
+```text
+customer_unique_id
+```
+
+---
+
+## Risco 4 — Considerar múltiplas reviews como duplicatas
+
+As avaliações múltiplas serão preservadas.
+
+Qualquer agregação futura deverá possuir regra analítica explícita.
+
+---
+
+## Risco 5 — Interpretar ausência como erro
+
+Valores ausentes serão interpretados de acordo com:
+
+* variável;
+* status;
+* granularidade;
+* contexto do negócio.
+
+---
+
+## Risco 6 — Inferir causalidade a partir de associação
+
+Uma relação observada entre duas variáveis não será apresentada automaticamente como causa.
+
+As conclusões deverão distinguir:
+
+* fato observado;
+* associação;
+* hipótese;
+* evidência;
+* conclusão.
+
+---
+
+# 21. Decisões metodológicas consolidadas
+
+Ao final da Data Discovery, foram estabelecidas as seguintes decisões:
+
+1. `orders` representa pedidos.
+2. `order_items` representa itens vendidos.
+3. A chave dos itens é a combinação `(order_id, order_item_id)`.
+4. A receita principal de produtos será calculada através de `order_items.price`.
+5. `freight_value` será analisado separadamente.
+6. `payment_value` será complementar.
+7. `customer_unique_id` será utilizado para análises de recorrência.
+8. `review_id` não será tratado como identificador globalmente único.
+9. Reviews múltiplas não serão removidas automaticamente.
+10. Produtos sem categoria serão preservados.
+11. Categorias sem tradução serão preservadas.
+12. Sellers serão analisados separadamente da localização dos clientes.
+13. Dados ausentes não serão automaticamente considerados erros.
+14. Anomalias serão documentadas antes de qualquer tratamento.
+15. Não será imposta uma queda de 15% aos dados.
+16. Não serão feitas afirmações causais sem evidência adequada.
+
+---
+
+# 22. Encerramento da etapa de Data Discovery
+
+A estrutura do conjunto de dados foi investigada e documentada de forma suficiente para iniciar a próxima etapa do projeto.
+
+Neste momento, já estão estabelecidos:
+
+* o significado das principais tabelas;
+* a granularidade dos dados;
+* as principais chaves;
+* os relacionamentos;
+* as fontes de receita;
+* as dimensões relevantes;
+* as limitações conhecidas;
+* os principais riscos metodológicos.
+
+Portanto, a etapa de Data Discovery pode ser considerada **metodologicamente concluída após a consolidação e versionamento desta documentação**.
+
+A próxima etapa será:
+
+> **Data Profiling orientado pela pergunta de negócio.**
+
+O objetivo será medir a qualidade e o comportamento das variáveis efetivamente relevantes para a análise, preparando o conjunto para a Análise Exploratória de Dados (EDA).
